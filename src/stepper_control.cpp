@@ -19,6 +19,9 @@ void print_DRV_STATUS()
     auto cs_actual = stepper.cs_actual();
     auto stealth = stepper.stealth();
     auto stst = stepper.stst();
+    auto pwm_grad_auto = stepper.pwm_grad_auto();
+    auto pwm_ofs_auto = stepper.pwm_ofs_auto();
+    auto pwm_scale_auto = stepper.pwm_scale_auto();
     serialPrintln("DRV_STATUS");
     serialPrintln("otpw %d", otpw);
     serialPrintln("ot %d", ot);
@@ -35,6 +38,9 @@ void print_DRV_STATUS()
     serialPrintln("cs_actual %d", cs_actual);
     serialPrintln("stealth %d", stealth);
     serialPrintln("stst %d", stst);
+    serialPrintln("pwm_grad_auto %d", pwm_grad_auto);
+    serialPrintln("pwm_ofs_auto %d", pwm_ofs_auto);
+    serialPrintln("pwm_scale_auto %d", pwm_scale_auto);
 }
 
 void enableStepper()
@@ -68,8 +74,14 @@ void setupStepperControl()
     stepper.toff(4);
     stepper.blank_time(24);
     stepper.rms_current(750);
-    stepper.en_spreadCycle(false);
     stepper.microsteps(STEPPING);
+    // stealthchop configuration
+    stepper.en_spreadCycle(false); // enable stealthchop, i.e., fast velocities ('0' <=> enabled)
+    stepper.pwm_autoscale(true); // enable automatic current scaling
+    stepper.pwm_autograd(true); // enable automatic tuning of PWM_GRAD_AUTO
+    stepper.pwm_grad(10); // hard coded from a manual rms calibration run
+    stepper.pwm_ofs(78); // hard coded from a manual rms calibration run
+    // coolstep configuration
     stepper.TCOOLTHRS(0xFFFFF);
     stepper.semin(5);
     stepper.semax(2);
@@ -78,17 +90,6 @@ void setupStepperControl()
 
     serialPrintln("done, waiting 200 milliseconds for stealth chop calibration");
     delay(200);
-
-    // test full rotation forward
-    serialPrintln("stepping forward");
-    step(STEPS_PER_REVOLUTION, true);
-    serialPrintln("done, waiting a second");
-    delay(1000);
-
-    // test full rotation backward
-    serialPrintln("stepping backward");
-    step(STEPS_PER_REVOLUTION, false);
-    serialPrintln("done");
 
     print_DRV_STATUS();
 }
@@ -115,4 +116,20 @@ void step(uint32_t steps, bool forward)
 
     digitalWrite(DIR_PIN, LOW);
     delayMicroseconds(1);
+}
+
+void calibrateRMS() {
+
+    // test full rotation forward
+    serialPrintln("stepping forward");
+    step(STEPS_PER_REVOLUTION, true);
+    serialPrintln("done, waiting a second");
+    delay(1000);
+
+    // test full rotation backward
+    serialPrintln("stepping backward");
+    step(STEPS_PER_REVOLUTION, false);
+    serialPrintln("done");
+
+    print_DRV_STATUS();
 }

@@ -160,6 +160,9 @@ void setup()
   server.on("/rotate_center", HTTP_GET, [](AsyncWebServerRequest *request)
             { rotateAndCenter(request); request->send(200, "text/plain", "ok"); });
 
+  server.on("/calibrate_rms", HTTP_GET, [](AsyncWebServerRequest *request)
+            { calibrateRMS(); request->send(200, "text/plain", "ok"); });
+
   server.on("/setup", HTTP_GET, [](AsyncWebServerRequest *request)
             { request->send(200, "text/plain", "hello world"); });
 

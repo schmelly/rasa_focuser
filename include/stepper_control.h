@@ -29,5 +29,6 @@
 
 void setupStepperControl();
 void step(uint32_t steps, bool forward);
+void calibrateRMS();
 
 #endif //STEPPER_CONTROL_H
