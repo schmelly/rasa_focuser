@@ -1,27 +1,28 @@
 #include "stepper_control.h"
 
-TMC2209Stepper stepper(&Serial2, R_SENSE, DRIVER_ADDRESS);
+TMC2209Stepper driver(&Serial2, R_SENSE, DRIVER_ADDRESS);
+AccelStepper stepper = AccelStepper(stepper.DRIVER, STEP_PIN, DIR_PIN);
 
 void print_DRV_STATUS()
 {
-    auto otpw = stepper.otpw();
-    auto ot = stepper.ot();
-    auto s2ga = stepper.s2ga();
-    auto s2gb = stepper.s2gb();
-    auto s2vsa = stepper.s2vsa();
-    auto s2vsb = stepper.s2vsb();
-    auto ola = stepper.ola();
-    auto olb = stepper.olb();
-    auto t120 = stepper.t120();
-    auto t143 = stepper.t143();
-    auto t150 = stepper.t150();
-    auto t157 = stepper.t157();
-    auto cs_actual = stepper.cs_actual();
-    auto stealth = stepper.stealth();
-    auto stst = stepper.stst();
-    auto pwm_grad_auto = stepper.pwm_grad_auto();
-    auto pwm_ofs_auto = stepper.pwm_ofs_auto();
-    auto pwm_scale_auto = stepper.pwm_scale_auto();
+    auto otpw = driver.otpw();
+    auto ot = driver.ot();
+    auto s2ga = driver.s2ga();
+    auto s2gb = driver.s2gb();
+    auto s2vsa = driver.s2vsa();
+    auto s2vsb = driver.s2vsb();
+    auto ola = driver.ola();
+    auto olb = driver.olb();
+    auto t120 = driver.t120();
+    auto t143 = driver.t143();
+    auto t150 = driver.t150();
+    auto t157 = driver.t157();
+    auto cs_actual = driver.cs_actual();
+    auto stealth = driver.stealth();
+    auto stst = driver.stst();
+    auto pwm_grad_auto = driver.pwm_grad_auto();
+    auto pwm_ofs_auto = driver.pwm_ofs_auto();
+    auto pwm_scale_auto = driver.pwm_scale_auto();
     serialPrintln("DRV_STATUS");
     serialPrintln("otpw %d", otpw);
     serialPrintln("ot %d", ot);
@@ -70,23 +71,30 @@ void setupStepperControl()
     enableStepper();
 
     serialPrintln("setupStepperControl(), configure stepper");
-    stepper.begin();
-    stepper.toff(4);
-    stepper.blank_time(24);
-    stepper.rms_current(750);
-    stepper.microsteps(STEPPING);
+    driver.begin();
+    driver.toff(4);
+    driver.blank_time(24);
+    driver.rms_current(1000);
+    driver.microsteps(STEPPING);
     // stealthchop configuration
-    stepper.en_spreadCycle(false); // enable stealthchop, i.e., fast velocities ('0' <=> enabled)
-    stepper.pwm_autoscale(true); // enable automatic current scaling
-    stepper.pwm_autograd(true); // enable automatic tuning of PWM_GRAD_AUTO
-    stepper.pwm_grad(10); // hard coded from a manual rms calibration run
-    stepper.pwm_ofs(78); // hard coded from a manual rms calibration run
+    driver.en_spreadCycle(false); // enable stealthchop, i.e., fast velocities ('0' <=> enabled)
+    driver.pwm_autoscale(true);   // enable automatic current scaling
+    driver.pwm_autograd(true);    // enable automatic tuning of PWM_GRAD_AUTO
+    driver.pwm_grad(11);          // hard coded from a manual rms calibration run
+    driver.pwm_ofs(144);          // hard coded from a manual rms calibration run
     // coolstep configuration
-    stepper.TCOOLTHRS(0xFFFFF);
-    stepper.semin(5);
-    stepper.semax(2);
-    stepper.sedn(0b01);
-    stepper.SGTHRS(100);
+    driver.TCOOLTHRS(0xFFFFF);
+    driver.semin(5);
+    driver.semax(2);
+    driver.sedn(0b01);
+    driver.SGTHRS(100);
+
+    stepper.disableOutputs();
+    stepper.setMaxSpeed(STEPS_PER_REVOLUTION);
+    stepper.setAcceleration(6400); // max speed after 0.5 secs at 1600 steps / revolution
+    stepper.setEnablePin(ENABLE_PIN);
+    stepper.setPinsInverted(false, false, true);
+    stepper.setCurrentPosition(startPosition);
 
     serialPrintln("done, waiting 200 milliseconds for stealth chop calibration");
     delay(200);
@@ -94,42 +102,57 @@ void setupStepperControl()
     print_DRV_STATUS();
 }
 
-void step(uint32_t steps, bool forward)
-{
-    if (forward)
-    {
-        digitalWrite(DIR_PIN, IN);
-    }
-    else
-    {
-        digitalWrite(DIR_PIN, OUT);
-    }
-    delayMicroseconds(1);
-
-    for (uint32_t i = 0; i < steps; i++)
-    {
-        digitalWrite(STEP_PIN, HIGH);
-        delayMicroseconds(1);
-        digitalWrite(STEP_PIN, LOW);
-        delayMicroseconds(T_STEP_DELAY - 1);
-    }
-
-    digitalWrite(DIR_PIN, LOW);
-    delayMicroseconds(1);
+int32_t readStepperPosition() {
+    return stepper.currentPosition();
 }
 
-void calibrateRMS() {
+bool isStepperMoving()
+{
+    return stepper.isRunning();
+}
+
+bool updateStepperState()
+{
+    auto running = stepper.run();
+    if (!running)
+    {
+        stepper.disableOutputs();
+    }
+    return running;
+}
+
+void moveStepper()
+{
+    stepper.enableOutputs();
+    stepper.moveTo(targetPosition);
+}
+
+void stopStepper()
+{
+    stepper.stop();
+}
+
+void calibrateRMS()
+{
+    calibratingRMS = true;
+    stepper.enableOutputs();
 
     // test full rotation forward
     serialPrintln("stepping forward");
-    step(STEPS_PER_REVOLUTION, true);
-    serialPrintln("done, waiting a second");
-    delay(1000);
+    stepper.moveTo(stepper.currentPosition() + STEPS_PER_REVOLUTION);
+    // step(STEPS_PER_REVOLUTION, true);
+    delay(3000);
 
     // test full rotation backward
-    serialPrintln("stepping backward");
-    step(STEPS_PER_REVOLUTION, false);
+    serialPrintln("done, stepping backward");
+    stepper.moveTo(stepper.currentPosition() - STEPS_PER_REVOLUTION);
     serialPrintln("done");
 
+    stepper.disableOutputs();
     print_DRV_STATUS();
+    calibratingRMS = false;
+}
+
+void overwriteStepperPosition(int32_t position) {
+    stepper.setCurrentPosition(position);
 }

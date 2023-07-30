@@ -3,11 +3,6 @@
 State curState = State::NOT_CONNECTED;
 Event curEvent = {0, EventType::NONE};
 
-bool moveTo(int32_t position)
-{
-  return true;
-}
-
 // handle state NOT_CONNECTED
 
 template <>

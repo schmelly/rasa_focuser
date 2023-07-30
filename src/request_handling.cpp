@@ -178,7 +178,7 @@ template <>
 DynamicJsonDocument prepareResponse<AlpacaRequestType::focuser_position, HTTP_GET>()
 {
     serialPrintln("prepareResponse<AlpacaRequestType::focuser_position, HTTP_GET>()");
-    return simpleValueResponse(position);
+    return simpleValueResponse(readStepperPosition());
 }
 
 template <>
@@ -254,11 +254,8 @@ Result processRequest<AlpacaRequestType::focuser_move, HTTP_PUT>(AsyncWebServerR
     return result;
 }
 
-void rotateAndCenter(AsyncWebServerRequest *request)
+void resetPosition(AsyncWebServerRequest *request)
 {
-    auto angle = getOrDefaultRequestParam<int32_t>(request, "angle", 0, false);
-    int32_t steps = (int32_t)STEPS_PER_ANGLE(angle);
-    step(abs(steps), angle >= 0);
-    position = (int32_t)(MAX_STEP / 2.0);
-    targetPosition = (int32_t)(MAX_STEP / 2.0);
+    overwriteStepperPosition(startPosition);
+    targetPosition = startPosition;
 }

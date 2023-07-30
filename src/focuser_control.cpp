@@ -20,32 +20,21 @@ void updateFocuserPosition(void *pvParameters)
     {
         if (curState == State::MOVING)
         {
-            uint32_t increment = 1;
-            if (abs(targetPosition - position) > 100)
-            {
-                increment = 100;
-            }
-            else if (abs(targetPosition - position) > 10)
-            {
-                increment = 10;
-            }
-
-            if (position < targetPosition)
-            {
-                step(increment, true);
-                position += increment;
-            }
-            else if (position > targetPosition)
-            {
-                step(increment, false);
-                position -= increment;
-            }
-            else
-            {
+            if(!isStepperMoving() && readStepperPosition() == targetPosition) {
                 serialPrintln("updateFocuserPosition(): reached targetPosition");
                 submitEvent<EventType::HALT>(0);
             }
+            else if(!isStepperMoving() && readStepperPosition() != targetPosition) {
+                moveStepper();
+            }
         }
+        else {
+            if(isStepperMoving() && !calibratingRMS) {
+                stopStepper();
+            }
+        }
+        
+        updateStepperState();
         vTaskDelay(pdMS_TO_TICKS(1));
     }
 }

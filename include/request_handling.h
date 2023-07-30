@@ -93,6 +93,6 @@ void handleRequest(AsyncWebServerRequest *request)
     request->send(response);
 }
 
-void rotateAndCenter(AsyncWebServerRequest *request);
+void resetPosition(AsyncWebServerRequest *request);
 
 #endif // REQUEST_HANDLING_H

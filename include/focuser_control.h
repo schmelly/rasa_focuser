@@ -7,7 +7,6 @@
 #include "stepper_control.h"
 
 extern State curState;
-extern int32_t position;
 extern int32_t targetPosition;
 
 void setupFocuserControl();

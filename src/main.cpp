@@ -27,8 +27,9 @@ AsyncWiFiManager wifiManager(&server, &dns);
 
 // alpaca objects
 uint32_t transactionId = 0;
-int32_t position = (int32_t)(MAX_STEP / 2.0);
-int32_t targetPosition = position;
+const int32_t startPosition = (int32_t)(MAX_STEP / 2.0);
+int32_t targetPosition = startPosition;
+bool calibratingRMS = false;
 
 void notFound(AsyncWebServerRequest *request)
 {
@@ -157,8 +158,8 @@ void setup()
   server.on("/api/v1/focuser/0/temperature", HTTP_GET, [](AsyncWebServerRequest *request)
             { handleRequest<AlpacaRequestType::focuser_temperature, HTTP_GET>(request); });
 
-  server.on("/rotate_center", HTTP_GET, [](AsyncWebServerRequest *request)
-            { rotateAndCenter(request); request->send(200, "text/plain", "ok"); });
+  server.on("/reset_position", HTTP_GET, [](AsyncWebServerRequest *request)
+            { resetPosition(request); request->send(200, "text/plain", "ok"); });
 
   server.on("/calibrate_rms", HTTP_GET, [](AsyncWebServerRequest *request)
             { calibrateRMS(); request->send(200, "text/plain", "ok"); });
@@ -168,6 +169,13 @@ void setup()
 
   server.on("/setup/v1/focuser/0/setup", HTTP_GET, [](AsyncWebServerRequest *request)
             { request->send(200, "text/plain", "hello world"); });
+
+  server.on("/reset_wifi", HTTP_GET, [](AsyncWebServerRequest *request)
+            { 
+              wifiManager.resetSettings();
+              request->send(200, "text/plain", "wifi resetted, restarting");
+              ESP.restart();
+            });
 
   server.onNotFound(notFound);
 
