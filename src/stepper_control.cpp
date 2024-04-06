@@ -2,6 +2,7 @@
 
 TMC2209Stepper driver(&Serial2, R_SENSE, DRIVER_ADDRESS);
 AccelStepper stepper = AccelStepper(stepper.DRIVER, STEP_PIN, DIR_PIN);
+TaskHandle_t calibrateRMSTask;
 
 void print_DRV_STATUS()
 {
@@ -77,17 +78,17 @@ void setupStepperControl()
     driver.rms_current(1000);
     driver.microsteps(STEPPING);
     // stealthchop configuration
-    driver.en_spreadCycle(false); // enable stealthchop, i.e., fast velocities ('0' <=> enabled)
-    driver.pwm_autoscale(true);   // enable automatic current scaling
-    driver.pwm_autograd(true);    // enable automatic tuning of PWM_GRAD_AUTO
-    driver.pwm_grad(11);          // hard coded from a manual rms calibration run
-    driver.pwm_ofs(144);          // hard coded from a manual rms calibration run
+    driver.en_spreadCycle(true); // enable stealthchop, i.e., fast velocities ('0' <=> enabled)
+    driver.pwm_autoscale(true);  // enable automatic current scaling
+    driver.pwm_autograd(true);   // enable automatic tuning of PWM_GRAD_AUTO
+    driver.pwm_grad(14);         // hard coded from a manual rms calibration run | was 11
+    driver.pwm_ofs(149);         // hard coded from a manual rms calibration run | was 144
     // coolstep configuration
     driver.TCOOLTHRS(0xFFFFF);
-    driver.semin(5);
-    driver.semax(2);
-    driver.sedn(0b01);
-    driver.SGTHRS(100);
+    driver.semin(0); // was 5
+    // driver.semax(2);           // was active
+    // driver.sedn(0b01);         // was active
+    driver.SGTHRS(0); // was 100
 
     stepper.disableOutputs();
     stepper.setMaxSpeed(STEPS_PER_REVOLUTION);
@@ -100,9 +101,19 @@ void setupStepperControl()
     delay(200);
 
     print_DRV_STATUS();
+
+    xTaskCreatePinnedToCore(
+        calibrateRMS,           /* Task function. */
+        "calibrateRMSTaskTask", /* name of task. */
+        10000,                  /* Stack size of task */
+        nullptr,                /* parameter of the task */
+        1,                      /* priority of the task */
+        &calibrateRMSTask,      /* Task handle to keep track of created task */
+        1);                     /* pin task to core 1 */
 }
 
-int32_t readStepperPosition() {
+int32_t readStepperPosition()
+{
     return stepper.currentPosition();
 }
 
@@ -132,27 +143,46 @@ void stopStepper()
     stepper.stop();
 }
 
-void calibrateRMS()
+void beginCalibrateRMS()
 {
     calibratingRMS = true;
-    stepper.enableOutputs();
-
-    // test full rotation forward
-    serialPrintln("stepping forward");
-    stepper.moveTo(stepper.currentPosition() + STEPS_PER_REVOLUTION);
-    // step(STEPS_PER_REVOLUTION, true);
-    delay(3000);
-
-    // test full rotation backward
-    serialPrintln("done, stepping backward");
-    stepper.moveTo(stepper.currentPosition() - STEPS_PER_REVOLUTION);
-    serialPrintln("done");
-
-    stepper.disableOutputs();
-    print_DRV_STATUS();
-    calibratingRMS = false;
 }
 
-void overwriteStepperPosition(int32_t position) {
+void calibrateRMS(void *pvParameters)
+{
+    for (;;)
+    {
+        if (calibratingRMS)
+        {
+            stepper.enableOutputs();
+
+            // test full rotation forward
+            serialPrintln("stepping forward");
+            stepper.moveTo(stepper.currentPosition() + STEPS_PER_REVOLUTION);
+            vTaskDelay(pdMS_TO_TICKS(100));
+            print_DRV_STATUS();
+            vTaskDelay(pdMS_TO_TICKS(3900));
+            serialPrintln("done");
+
+            // test full rotation backward
+            serialPrintln("stepping backward");
+            stepper.moveTo(stepper.currentPosition() - STEPS_PER_REVOLUTION);
+            vTaskDelay(pdMS_TO_TICKS(100));
+            print_DRV_STATUS();
+            vTaskDelay(pdMS_TO_TICKS(3900));
+            serialPrintln("done");
+
+            stepper.disableOutputs();
+            calibratingRMS = false;
+        }
+        else
+        {
+            vTaskDelay(pdMS_TO_TICKS(1));
+        }
+    }
+}
+
+void overwriteStepperPosition(int32_t position)
+{
     stepper.setCurrentPosition(position);
 }

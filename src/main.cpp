@@ -162,7 +162,7 @@ void setup()
             { resetPosition(request); request->send(200, "text/plain", "ok"); });
 
   server.on("/calibrate_rms", HTTP_GET, [](AsyncWebServerRequest *request)
-            { calibrateRMS(); request->send(200, "text/plain", "ok"); });
+            { beginCalibrateRMS(); request->send(200, "text/plain", "ok"); });
 
   server.on("/setup", HTTP_GET, [](AsyncWebServerRequest *request)
             { request->send(200, "text/plain", "hello world"); });
@@ -174,6 +174,12 @@ void setup()
             { 
               wifiManager.resetSettings();
               request->send(200, "text/plain", "wifi resetted, restarting");
+              ESP.restart();
+            });
+
+  server.on("/reset_esp", HTTP_GET, [](AsyncWebServerRequest *request)
+            {
+              request->send(200, "text/plain", "esp restarting");
               ESP.restart();
             });
 

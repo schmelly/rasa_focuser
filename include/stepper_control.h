@@ -39,7 +39,8 @@ bool isStepperMoving();
 bool updateStepperState();
 void moveStepper();
 void stopStepper();
-void calibrateRMS();
+void beginCalibrateRMS();
+void calibrateRMS(void *pvParameters);
 void overwriteStepperPosition(int32_t position);
 
 #endif //STEPPER_CONTROL_H
